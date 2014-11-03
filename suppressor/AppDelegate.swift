@@ -10,6 +10,17 @@ import Cocoa
 
 import CoreAudio
 
+func osStatusToString(status: OSStatus) -> String {
+    // this sucks.
+    
+    switch Int(status) {
+    case kAudioHardwareUnknownPropertyError:
+        return "Unknown property.";
+    default:
+        return String(format: "Unknown error: %d", status);
+    }
+}
+
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
     
@@ -62,25 +73,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             // TODO fuck, how do I enumerate the channels?!
-            var channel = 2;
             
-            //var channelAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioObjectPropertyElementName), mScope: <#AudioObjectPropertyScope#>, mElement: <#AudioObjectPropertyElement#>)
+
+            var channelsAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioDevicePropertyPreferredChannelsForStereo), mScope: UInt32(kAudioDevicePropertyScopeInput), mElement: UInt32(kAudioObjectPropertyElementWildcard));
+            
+                        // first, let's find out how many there are
+            
+            var channelsCount : UInt32 = 0;
+            
+            error = AudioObjectGetPropertyDataSize(inputDevice, &channelsAddress, 0, nil, &channelsCount);
+            if(error != 0) {
+                NSLog("Unknown error retrieving number of channels on input device: \(osStatusToString(error))");
+                return;
+            }
+            
+            NSLog("You have %d channels on your input device", channelsCount)
+            
+            
+            //fvar channelAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioObjectPropertyElementName), mScope: <#AudioObjectPropertyScope#>, mElement: <#AudioObjectPropertyElement#>)
             
             // now, build a PropertyAddress that describes the input gain control on it
-            var inputVolumeControlAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioDevicePropertyVolumeScalar), mScope: UInt32(kAudioDevicePropertyScopeInput), mElement: UInt32(channel));
+            var inputVolumeControlAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioDevicePropertyVolumeScalar), mScope: UInt32(kAudioDevicePropertyScopeInput), mElement: UInt32(0));
 
             var currentVolume: Float32 = 0;
             var volumeSize = UInt32(sizeof(Float32));
 
             error = AudioObjectGetPropertyData(inputDevice, &inputVolumeControlAddress, 0, nil, &volumeSize, &currentVolume);
             if(error != 0) {
-                if (kAudioHardwareUnknownPropertyError == Int(error)) {
-                    // kAudioHardwareUnknownPropertyError.
-                    NSLog("Core Audio reports 'unknown property' for the volume control.");
-                } else {
-                    // var prettyError = NSError(domain: NSOSStatusErrorDomain!, code: Int(error), userInfo: nil);
-                    NSLog("ULTRAFARTS, unable to get ye current volume setting, unknown reason: %d", error);
-                }
+                NSLog("Core Audio reports error when trying to retrieve the current volume: \(osStatusToString(error))");
                 return;
             }
             
@@ -98,10 +118,4 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(aNotification: NSNotification) {
         // Insert code here to tear down your application
     }
-    
-    func osStatusToString(status: OSStatus) -> String {
-        return "asdfsaf";
-    }
-
-
 }
