@@ -31,6 +31,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // https://developer.apple.com/library/mac/qa/qa1016/_index.html DEPRECATED (without any note, thanks a lot Apple)
     
     // https://developer.apple.com/library/mac/technotes/tn2223/_index.html SEEMS ACTUALLY LEGIT
+    
+    // http://www.slideshare.net/colineberhardt/reactive-cocoa-made-simple-with-swift
 
     func applicationDidFinishLaunching(aNotification: NSNotification) {
         // Insert code here to initialize your application
