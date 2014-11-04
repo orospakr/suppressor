@@ -49,7 +49,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // Get the default audio device:
             // TODO: these UInt32 casts are grody.  API bug (the contants are Ints whereas the field types are UInt) or is there a better way to do this?
-            var poop = AudioObjectPropertyAddress(mSelector:  UInt32(kAudioHardwarePropertyDefaultOutputDevice), mScope: UInt32(kAudioObjectPropertyScopeGlobal), mElement: UInt32(kAudioObjectPropertyElementMaster));
+            var poop = AudioObjectPropertyAddress(mSelector:  UInt32(kAudioHardwarePropertyDefaultInputDevice), mScope: UInt32(kAudioObjectPropertyScopeGlobal), mElement: UInt32(kAudioObjectPropertyElementMaster));
             
             
             
@@ -73,9 +73,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             // TODO fuck, how do I enumerate the channels?!
-            
 
-            var channelsAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioDevicePropertyPreferredChannelsForStereo), mScope: UInt32(kAudioDevicePropertyScopeInput), mElement: UInt32(kAudioObjectPropertyElementWildcard));
+            var channelsAddress = AudioObjectPropertyAddress(
+                mSelector: UInt32(kAudioDevicePropertyPreferredChannelsForStereo),
+                mScope: UInt32(kAudioDevicePropertyScopeInput),
+                mElement: UInt32(kAudioObjectPropertyElementWildcard))
             
                         // first, let's find out how many there are
             
@@ -92,27 +94,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             //fvar channelAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioObjectPropertyElementName), mScope: <#AudioObjectPropertyScope#>, mElement: <#AudioObjectPropertyElement#>)
             
-            // now, build a PropertyAddress that describes the input gain control on it
-            var inputVolumeControlAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioDevicePropertyVolumeScalar), mScope: UInt32(kAudioDevicePropertyScopeInput), mElement: UInt32(0));
-
-            var currentVolume: Float32 = 0;
-            var volumeSize = UInt32(sizeof(Float32));
-
-            error = AudioObjectGetPropertyData(inputDevice, &inputVolumeControlAddress, 0, nil, &volumeSize, &currentVolume);
-            if(error != 0) {
-                NSLog("Core Audio reports error when trying to retrieve the current volume: \(osStatusToString(error))");
-                return;
+            for channel in 0...channelsCount {
+                NSLog("Getting volume for channel \(channel).")
+                
+                // now, build a PropertyAddress that describes the input gain control on it
+                var inputVolumeControlAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioDevicePropertyVolumeScalar), mScope: UInt32(kAudioDevicePropertyScopeInput), mElement: UInt32(0));
+                
+                var currentVolume: Float32 = 0;
+                var volumeSize = UInt32(sizeof(Float32));
+                
+                error = AudioObjectGetPropertyData(inputDevice, &inputVolumeControlAddress, 0, nil, &volumeSize, &currentVolume);
+                if(error != 0) {
+                    NSLog("Core Audio reports error when trying to retrieve the current volume: \(osStatusToString(error))");
+                    return;
+                }
+                
+                NSLog("WOO, got current volume for channel \(channel): %f", currentVolume);
             }
             
-            NSLog("WOO, got current volume: %f", currentVolume);
-            
-            
             // Now, to see if the gain is settable on it:
-            
-            
         });
-        
-        
     }
 
     func applicationWillTerminate(aNotification: NSNotification) {
