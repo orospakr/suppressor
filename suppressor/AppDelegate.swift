@@ -51,8 +51,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // TODO: these UInt32 casts are grody.  API bug (the contants are Ints whereas the field types are UInt) or is there a better way to do this?
             var poop = AudioObjectPropertyAddress(mSelector:  UInt32(kAudioHardwarePropertyDefaultInputDevice), mScope: UInt32(kAudioObjectPropertyScopeGlobal), mElement: UInt32(kAudioObjectPropertyElementMaster));
             
-            
-            
             // And determine that it exists:
             // 0 is falsy on the old Boolean type
             if(AudioObjectHasProperty(UInt32(kAudioObjectSystemObject), &poop) == 0) {
