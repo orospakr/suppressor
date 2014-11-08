@@ -13,6 +13,7 @@
 		E70E88171A05D55E00C76817 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E70E88161A05D55E00C76817 /* Images.xcassets */; };
 		E70E881A1A05D55E00C76817 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = E70E88181A05D55E00C76817 /* Main.storyboard */; };
 		E70E88261A05D55E00C76817 /* suppressorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70E88251A05D55E00C76817 /* suppressorTests.swift */; };
+		E754DCDD1A09AF6F0084B56B /* MyWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E754DCDC1A09AF6F0084B56B /* MyWindowController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,6 +39,7 @@
 		E70E88241A05D55E00C76817 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E70E88251A05D55E00C76817 /* suppressorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = suppressorTests.swift; sourceTree = "<group>"; };
 		E72C4FA31A0872BF0027000E /* BridgingHeader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BridgingHeader.h; sourceTree = "<group>"; };
+		E754DCDC1A09AF6F0084B56B /* MyWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MyWindowController.swift; sourceTree = "<group>"; };
 		FA1EEAEF11BD79963C7E7A12 /* Pods.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = Pods.release.xcconfig; path = "Pods/Target Support Files/Pods/Pods.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -106,6 +108,7 @@
 				E70E88181A05D55E00C76817 /* Main.storyboard */,
 				E70E88101A05D55E00C76817 /* Supporting Files */,
 				E72C4FA31A0872BF0027000E /* BridgingHeader.h */,
+				E754DCDC1A09AF6F0084B56B /* MyWindowController.swift */,
 			);
 			path = suppressor;
 			sourceTree = "<group>";
@@ -269,6 +272,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E754DCDD1A09AF6F0084B56B /* MyWindowController.swift in Sources */,
 				E70E88151A05D55E00C76817 /* ViewController.swift in Sources */,
 				E70E88131A05D55E00C76817 /* AppDelegate.swift in Sources */,
 			);

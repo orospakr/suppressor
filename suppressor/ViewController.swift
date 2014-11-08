@@ -9,11 +9,16 @@
 import Cocoa
 
 class ViewController: NSViewController {
+    
+    
+    @IBOutlet weak var materialBackground: NSVisualEffectView!
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
         // Do any additional setup after loading the view.
+        
+        materialBackground.material = NSVisualEffectMaterial.Titlebar;
     }
 
     override var representedObject: AnyObject? {
@@ -21,7 +26,4 @@ class ViewController: NSViewController {
         // Update the view, if already loaded.
         }
     }
-
-
 }
-
