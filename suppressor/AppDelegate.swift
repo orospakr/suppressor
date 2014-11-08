@@ -11,7 +11,7 @@ import Cocoa
 import CoreAudio
 
 func osStatusToString(status: OSStatus) -> String {
-    // this sucks.
+    // this sucks. lol objc API
     
     switch Int(status) {
     case kAudioHardwareUnknownPropertyError:
@@ -37,6 +37,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         })
     }
     
+    // typedef RACStream * (^RACStreamBindBlock)(id value, BOOL *stop);
+    
+    // a func that matches that declaration:
+//    func everyOtherEvent(value: AnyObject!, stop: ObjCBool) -> RACStream! {
+//        return nil;
+//    }
+//    
+
+    func everyOtherEvent() -> RACStreamBindBlock {
+        var poop = RACStream();
+        var clazz = self.superclass!;
+        
+        var flippy = false;
+        
+        return {
+            (id: AnyObject!, stop: UnsafeMutablePointer<ObjCBool>) -> RACStream! in
+            
+            stop.memory = false;
+        
+            // can't use swift's "is", because apparently you have to use a class literal with that, not a variable of a class
+            if(!id.isKindOfClass(clazz)) {
+                // TODO: once ReactiveCocoa gains a strongly-typed Swift API, this sort of silliness can go away :D
+                fatalError("everyOtherEvent's closure received an event of a differen type that itself.  It is a: " + id.superclass.debugDescription)
+            }
+            
+            var str = "Fdsaf"
+            var newStream : RACStream
+            if(flippy) {
+                newStream = RACSignal.`return`(str)
+            } else {
+                newStream = RACSignal.empty()
+            }
+            flippy = !flippy
+            return newStream
+        }
+    }
+    
     // https://github.com/InerziaSoft/ISSoundAdditions/blob/master/ISSoundAdditions.m
     
     // http://stackoverflow.com/questions/11041335/how-do-you-set-the-input-level-gain-on-the-built-in-input-osx-core-audio-au
@@ -57,8 +94,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSLog("YUMMY KEYSTROKES")
         }
         
-        
         // var poop = NSEvent();
+        
+        var wat = keystrokeSignal().bind(everyOtherEvent).subscribeNext { (woot: AnyObject!) -> Void in
+            NSLog("VOIP \(woot).");
+        }
         
         NSEvent.addGlobalMonitorForEventsMatchingMask(NSEventMask.KeyDownMask, { (NSEvent) -> Void in
             // poop smeeee
@@ -98,7 +138,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 mScope: UInt32(kAudioDevicePropertyScopeInput),
                 mElement: UInt32(kAudioObjectPropertyElementWildcard))
             
-                        // first, let's find out how many there are
+            // first, let's find out how many there are
             
             var channelsCount : UInt32 = 0;
             
@@ -114,7 +154,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             //fvar channelAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioObjectPropertyElementName), mScope: <#AudioObjectPropertyScope#>, mElement: <#AudioObjectPropertyElement#>)
             
             for channel in 0...channelsCount {
-                NSLog("Getting volume for channel \(channel).")
+                // NSLog("Getting volume for channel \(channel).")
                 
                 // now, build a PropertyAddress that describes the input gain control on it
                 var inputVolumeControlAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioDevicePropertyVolumeScalar), mScope: UInt32(kAudioDevicePropertyScopeInput), mElement: UInt32(0));
@@ -128,7 +168,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     return;
                 }
                 
-                NSLog("WOO, got current volume for channel \(channel): %f", currentVolume);
+                // NSLog("WOO, got current volume for channel \(channel): %f", currentVolume);
             }
             
             // Now, to see if the gain is settable on it:
