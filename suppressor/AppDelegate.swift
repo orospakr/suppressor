@@ -24,6 +24,19 @@ func osStatusToString(status: OSStatus) -> String {
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
     
+    
+    func keystrokeSignal() -> RACSignal {
+        return RACSignal.createSignal({ (subscriber) -> RACDisposable! in
+            NSLog("Keyboard listener created!")
+            
+            // TODO: how do I tear this listener down when the listener is no longer needed? Does ARC do it for me?
+            NSEvent.addGlobalMonitorForEventsMatchingMask(NSEventMask.KeyDownMask, handler: { (event) -> Void in
+                subscriber.sendNext(event);
+            })
+            return nil
+        })
+    }
+    
     // https://github.com/InerziaSoft/ISSoundAdditions/blob/master/ISSoundAdditions.m
     
     // http://stackoverflow.com/questions/11041335/how-do-you-set-the-input-level-gain-on-the-built-in-input-osx-core-audio-au
@@ -37,6 +50,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(aNotification: NSNotification) {
         // Insert code here to initialize your application
         
+        
+        // A note about typing and RACSignals under Swift one bummer about RAC seems to be that the signals themselves do not expose compile-time type information about what they emit, so listeners
+        // are expected to cast.  Probably a hangover from Objective-C.  The workarounds online either have you do a manual cast *or* a generic wrapper method which still just casts (even though it does infer from the arguments of the *receiver* of the stream, which is of course the wrong direction).  Presumably RAC3 (with official Swift support) will have a better solution for this.  I can't see any reason why it couldn't...
+        keystrokeSignal().subscribeNext { (untypedsadness: AnyObject!) -> Void in
+            NSLog("YUMMY KEYSTROKES")
+        }
         
         
         // var poop = NSEvent();
