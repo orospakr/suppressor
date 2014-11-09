@@ -10,6 +10,34 @@ import Cocoa
 
 import CoreAudio
 
+enum HysteresisTimeoutEvent<T> {
+    /**
+     * The observed source of events has emitted a fresh event.
+     */
+    case Arrival(T)
+    
+    /**
+     * The observed source of events has gone quiet.
+     */
+    case Timeout
+}
+
+enum Weenis {
+    case Poop
+}
+
+/**
+ * RAC* uses AnyObject for its untyped references. Enums are not AnyObjet compatible,
+ * but I want to pass them through.  So, boxing it is.
+ */
+class EnumContainer<E> {
+    let value: E
+    
+    init(v: E) {
+        value = v;
+    }
+}
+
 func osStatusToString(status: OSStatus) -> String {
     // this sucks. lol objc API
     
@@ -23,13 +51,11 @@ func osStatusToString(status: OSStatus) -> String {
 
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
-    
-    
     func keystrokeSignal() -> RACSignal {
         return RACSignal.createSignal({ (subscriber) -> RACDisposable! in
             NSLog("Keyboard listener created!")
             
-            // TODO: how do I tear this listener down when the listener is no longer needed? Does ARC do it for me?
+            // TODO: tear down this listener in the RACDisposable
             NSEvent.addGlobalMonitorForEventsMatchingMask(NSEventMask.KeyDownMask, handler: { (event) -> Void in
                 subscriber.sendNext(event);
             })
@@ -44,8 +70,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 //        return nil;
 //    }
 //    
+    
+    // TODO: namespace all of these shits into a "static" class?
+    
+
+    
+//    
+//    struct HysteresisTimeout {
+//        let type: HysteresisTimeoutEventType
+//        let
+//    }
+    
+    /**
+      * Be informed of when a RACSignal has gone quiet after a while.
+      *
+      * You'll receive values of HysteresisTimeoutEvents.
+    */
+    func hysteresisTimeout<T>(incoming: RACSignal, seconds: NSTimeInterval) -> RACSignal/*<HysteresisTimeoutEvent<T>>*/ {
+        // https://github.com/ReactiveCocoa/ReactiveCocoa/blob/ee85a34731382b01ea028026ef267b0952b7edde/ReactiveCocoa/RACSignal%2BOperations.m
+        
+        return RACSignal.createSignal { (subscriber:  RACSubscriber!) -> RACDisposable! in
+            
+            // create a scheduler to handle our delays (TODO; RAC's own code seems to look for a an existing scheduler "context". should do same for consistency, even if it seems gross)
+            var scheduler = RACScheduler();
+            
+            var scheduledTimeoutDisposable = scheduler.afterDelay(seconds, schedule: { () -> Void in
+               
+                subscriber.sendNext(EnumContainer<HysteresisTimeoutEvent<T>>(v: HysteresisTimeoutEvent<T>.Timeout))
+            })
+            
+            scheduledTimeoutDisposable.dispose();
+            
+            scheduler.afterDelay(7, schedule: { () -> Void in
+                
+            })
+            
+            return nil; // not bothering with disposable for now
+        }
+        
+    }
 
     func everyOtherEvent() -> RACStreamBindBlock {
+        var fdsafasdf = HysteresisTimeoutEvent.Arrival("lollerbutts")
+        
         var poop = RACStream();
         var clazz = self.superclass!;
         
@@ -83,7 +150,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // https://developer.apple.com/library/mac/technotes/tn2223/_index.html SEEMS ACTUALLY LEGIT
     
     // http://www.slideshare.net/colineberhardt/reactive-cocoa-made-simple-with-swift
-
+    
+    // http://www.slideshare.net/colineberhardt/reactivecocoa-and-swift-better-together GET RAC+SWIFT STRONG TYPING IMPROVEMENT HACK FROM HERE, PAGE 16
+    
     func applicationDidFinishLaunching(aNotification: NSNotification) {
         // Insert code here to initialize your application
         
@@ -94,11 +163,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSLog("YUMMY KEYSTROKES")
         }
         
+        
         // var poop = NSEvent();
+        
+        // bind doc: https://github.com/ReactiveCocoa/ReactiveCocoa/blob/master/ReactiveCocoa/RACSignal.m#L92
         
         var wat = keystrokeSignal().bind(everyOtherEvent).subscribeNext { (woot: AnyObject!) -> Void in
             NSLog("VOIP \(woot).");
         }
+        
+        // so, I need to design my event pipeline.  the main tricky bit is causing something to happen some delay after.  That is, I need to schedule a delay when I get something in the pipeline, BUT then I need to actually cancel that item (ie., not permit it to execute when something new comes through. it may not be possible to do that purely FRP.
+        
+        // Schedule a timer RACSignal as a side-effect from the subscription to the key event, and deschedule it whenever another happens? will certainly work, but basically leverages no FRP at all
+        
+        // make a Stream bind (proper term?) that creates and tears down a timer signal source that will emit a new event type into the pipeline (so, now it's a stream of MicrophoneCommands, namely MUTE and UNMUTE)
+        
+        // (keyStrokeSignal() -> NSEvent) --> (hysteresisDelay(3s) -> StateChange<true|false>) --> (microphoneSubscriber())
+        
+        // or, alternatively, in order to avoid implementing hysteresisDelay, which would have to be non-functional code, instead do:
+        
+        // keystrokes -> map to tuples of the orig keyboard event and a timeout signal -> mapFlatten -> take latest only, cancel all others -> microphone subscriber
+        
+        // keystrokes ->
+        
         
         NSEvent.addGlobalMonitorForEventsMatchingMask(NSEventMask.KeyDownMask, { (NSEvent) -> Void in
             // poop smeeee
