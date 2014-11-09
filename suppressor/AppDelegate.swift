@@ -49,6 +49,86 @@ func osStatusToString(status: OSStatus) -> String {
     }
 }
 
+/**
+*Just naiively mutes/unmutes the default input device, for now.
+*/
+func muteUnmute(mute: Bool) {
+    var error : OSStatus = 0;
+    
+    // Using CoreAudio with Swift has some rough edges.  There's a frequent type disagreement between Int and UInt32 constants and other int paramters.
+    
+    // Get the default audio device:
+    // TODO: these UInt32 casts are grody.  API bug (the contants are Ints whereas the field types are UInt) or is there a better way to do this?
+    var poop = AudioObjectPropertyAddress(mSelector:  UInt32(kAudioHardwarePropertyDefaultInputDevice), mScope: UInt32(kAudioObjectPropertyScopeGlobal), mElement: UInt32(kAudioObjectPropertyElementMaster));
+    
+    // And determine that it exists:
+    // 0 is falsy on the old Boolean type
+    if(AudioObjectHasProperty(UInt32(kAudioObjectSystemObject), &poop) == 0) {
+        NSLog("NO DEFAULT AUDIO INPUT?!");
+        return;
+    }
+    
+    var inputDevice : AudioDeviceID = 0;
+    
+    // why does Apple make us pass this size in?  surely they already know it? (is the idea to allow
+    // passing in different types?)
+    var audioDeviceIdSize = UInt32(sizeof(AudioDeviceID));
+    
+    if(AudioObjectGetPropertyData(UInt32(kAudioObjectSystemObject), &poop, 0, nil, &audioDeviceIdSize, &inputDevice) != 0) {
+        // weird, OS X said it was there, and yet, it asplode
+        NSLog("FUCKFARTS, CANNOT GET YE DEFAULT INPUT DEVICE");
+        return;
+    }
+    
+    // TODO fuck, how do I enumerate the channels?!
+    
+    var channelsAddress = AudioObjectPropertyAddress(
+        mSelector: UInt32(kAudioDevicePropertyPreferredChannelsForStereo),
+        mScope: UInt32(kAudioDevicePropertyScopeInput),
+        mElement: UInt32(kAudioObjectPropertyElementWildcard))
+    
+    // first, let's find out how many there are
+    
+    var channelsCount : UInt32 = 0;
+    
+    error = AudioObjectGetPropertyDataSize(inputDevice, &channelsAddress, 0, nil, &channelsCount);
+    if(error != 0) {
+        NSLog("Unknown error retrieving number of channels on input device: \(osStatusToString(error))");
+        return;
+    }
+    
+    NSLog("You have %d channels on your input device.", channelsCount)
+    
+    for channel in 0...channelsCount {
+        // NSLog("Getting volume for channel \(channel).")
+        
+        // now, build a PropertyAddress that describes the input gain control on it
+        var inputVolumeControlAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioDevicePropertyVolumeScalar), mScope: UInt32(kAudioDevicePropertyScopeInput), mElement: UInt32(0));
+        
+        var currentVolume: Float32 = 0;
+        var volumeSize = UInt32(sizeof(Float32));
+        
+        error = AudioObjectGetPropertyData(inputDevice, &inputVolumeControlAddress, 0, nil, &volumeSize, &currentVolume);
+        if(error != 0) {
+            NSLog("Core Audio reports error when trying to retrieve the current volume: \(osStatusToString(error))");
+            return;
+        }
+        
+        // NSLog("WOO, got current volume for channel \(channel): %f", currentVolume);
+        
+        // now, set the volume:
+        
+        var newVolume : Float32 = (mute ? 0.0 : 1.0);
+
+            error = AudioObjectSetPropertyData(inputDevice, &inputVolumeControlAddress, 0, nil, volumeSize, &newVolume)
+
+        
+    }
+    
+    // Now, to see if the gain is settable on it:
+}
+
+
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
     func keystrokeSignal() -> RACSignal {
@@ -62,6 +142,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return nil
         })
     }
+    
     
     // typedef RACStream * (^RACStreamBindBlock)(id value, BOOL *stop);
     
@@ -196,15 +277,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hysteresisTimeout(keystrokeSignal(), seconds: 2.0).subscribeNext(
             { ( hysteresisTimeoutEventBoxed : AnyObject!) -> Void in
                 if(!(hysteresisTimeoutEventBoxed! is EnumContainer<HysteresisTimeoutEvent<AnyObject>>)) {
-                    NSLog("FUCK FARTSADFASFDSAFD")
+                    // TODO: make this a fatal
+                    NSLog("Type mismatch error in microphone mute pipeline; hysteresisTimeout() did not honour its interface contract")
                 } else {
-                    // NSLog("GOT EVENT!")
                     var casted = hysteresisTimeoutEventBoxed as EnumContainer<HysteresisTimeoutEvent<AnyObject>>
                     switch casted.value {
                     case .Timeout:
                         NSLog("TIMEOUT!")
+                        muteUnmute(false);
                     case .Arrival:
                         NSLog("KEY!")
+                        muteUnmute(true);
                     }
                 }
             }, error: { (err: NSError!) -> Void in
@@ -221,79 +304,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Insert code here to tear down your application
     }
     
-    func spikeSolution() {
-        NSEvent.addGlobalMonitorForEventsMatchingMask(NSEventMask.KeyDownMask, { (NSEvent) -> Void in
-            // poop smeeee
-            NSLog("It's muting time!");
-            
-            var error : OSStatus = 0;
-            
-            // Using CoreAudio with Swift has some rough edges.  There's a frequent type disagreement between Int and UInt32 constants and other int paramters.
-            
-            // Get the default audio device:
-            // TODO: these UInt32 casts are grody.  API bug (the contants are Ints whereas the field types are UInt) or is there a better way to do this?
-            var poop = AudioObjectPropertyAddress(mSelector:  UInt32(kAudioHardwarePropertyDefaultInputDevice), mScope: UInt32(kAudioObjectPropertyScopeGlobal), mElement: UInt32(kAudioObjectPropertyElementMaster));
-            
-            // And determine that it exists:
-            // 0 is falsy on the old Boolean type
-            if(AudioObjectHasProperty(UInt32(kAudioObjectSystemObject), &poop) == 0) {
-                NSLog("NO DEFAULT AUDIO INPUT?!");
-                return;
-            }
-            
-            var inputDevice : AudioDeviceID = 0;
-            
-            // why does Apple make us pass this size in?  surely they already know it? (is the idea to allow
-            // passing in different types?)
-            var audioDeviceIdSize = UInt32(sizeof(AudioDeviceID));
-            
-            if(AudioObjectGetPropertyData(UInt32(kAudioObjectSystemObject), &poop, 0, nil, &audioDeviceIdSize, &inputDevice) != 0) {
-                // weird, OS X said it was there, and yet, it asplode
-                NSLog("FUCKFARTS, CANNOT GET YE DEFAULT INPUT DEVICE");
-                return;
-            }
-            
-            // TODO fuck, how do I enumerate the channels?!
-            
-            var channelsAddress = AudioObjectPropertyAddress(
-                mSelector: UInt32(kAudioDevicePropertyPreferredChannelsForStereo),
-                mScope: UInt32(kAudioDevicePropertyScopeInput),
-                mElement: UInt32(kAudioObjectPropertyElementWildcard))
-            
-            // first, let's find out how many there are
-            
-            var channelsCount : UInt32 = 0;
-            
-            error = AudioObjectGetPropertyDataSize(inputDevice, &channelsAddress, 0, nil, &channelsCount);
-            if(error != 0) {
-                NSLog("Unknown error retrieving number of channels on input device: \(osStatusToString(error))");
-                return;
-            }
-            
-            NSLog("You have %d channels on your input device", channelsCount)
-            
-            
-            //fvar channelAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioObjectPropertyElementName), mScope: <#AudioObjectPropertyScope#>, mElement: <#AudioObjectPropertyElement#>)
-            
-            for channel in 0...channelsCount {
-                // NSLog("Getting volume for channel \(channel).")
-                
-                // now, build a PropertyAddress that describes the input gain control on it
-                var inputVolumeControlAddress = AudioObjectPropertyAddress(mSelector: UInt32(kAudioDevicePropertyVolumeScalar), mScope: UInt32(kAudioDevicePropertyScopeInput), mElement: UInt32(0));
-                
-                var currentVolume: Float32 = 0;
-                var volumeSize = UInt32(sizeof(Float32));
-                
-                error = AudioObjectGetPropertyData(inputDevice, &inputVolumeControlAddress, 0, nil, &volumeSize, &currentVolume);
-                if(error != 0) {
-                    NSLog("Core Audio reports error when trying to retrieve the current volume: \(osStatusToString(error))");
-                    return;
-                }
-                
-                // NSLog("WOO, got current volume for channel \(channel): %f", currentVolume);
-            }
-            
-            // Now, to see if the gain is settable on it:
-        });
-    }
+    
+    
 }
