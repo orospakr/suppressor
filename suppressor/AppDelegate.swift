@@ -90,26 +90,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // https://github.com/ReactiveCocoa/ReactiveCocoa/blob/ee85a34731382b01ea028026ef267b0952b7edde/ReactiveCocoa/RACSignal%2BOperations.m
         
         return RACSignal.createSignal { (subscriber:  RACSubscriber!) -> RACDisposable! in
+            let allDisposables = RACCompoundDisposable()
             
-            // create a scheduler to handle our delays (TODO; RAC's own code seems to look for a an existing scheduler "context". should do same for consistency, even if it seems gross)
-            var scheduler = RACScheduler();
             
-            var scheduledTimeoutDisposable = scheduler.afterDelay(seconds, schedule: { () -> Void in
-                // using AnyObject as my type parameter for my enum for now, because declaring
-                // this function with a type parameter
-                // bloody well *segfaults* the swift compiler >.<
-                subscriber.sendNext(EnumContainer<HysteresisTimeoutEvent<AnyObject>>(v: HysteresisTimeoutEvent<AnyObject>.Timeout))
-            })
+            // STATE: the current timing out delay timer.  we want to cancel it on arrival of another event:
             
-            scheduledTimeoutDisposable.dispose();
+            var delayTicker : RACDisposable!
             
-            scheduler.afterDelay(7, schedule: { () -> Void in
+            allDisposables.addDisposable(incoming.subscribeNext({ (value: AnyObject!) -> Void in
+                // create a scheduler to handle our delays (TODO; RAC's own code seems to look for a an existing scheduler "context". should do same for consistency, even if it seems gross)
+                let scheduler = RACScheduler.currentScheduler()
                 
-            })
+                if let delayTickerToDestroy = delayTicker? {
+                    delayTickerToDestroy.dispose()
+                }
+                
+                // pass through the value, wrapped in our enum:
+                subscriber.sendNext(EnumContainer<HysteresisTimeoutEvent<AnyObject>>(v:HysteresisTimeoutEvent<AnyObject>.Arrival(value)))
+                
+                
+                
+                // and set up the timeout:
+                delayTicker = scheduler.afterDelay(seconds, schedule: { () -> Void in
+                    // using AnyObject as my type parameter for my enum for now, because declaring
+                    // this function with a type parameter
+                    // bloody well *segfaults* the swift compiler >.<
+                    subscriber.sendNext(EnumContainer<HysteresisTimeoutEvent<AnyObject>>(v: HysteresisTimeoutEvent<AnyObject>.Timeout))
+                })
+                
+                
+                
+                allDisposables.addDisposable(delayTicker)
+            }, error: { (err: NSError!) -> Void in
+                subscriber.sendError(err)
+            }, completed: { () -> Void in
+                subscriber.sendCompleted();
+            }))
             
-            return nil; // not bothering with disposable for now
+            return allDisposables
         }
-        
     }
 
     func everyOtherEvent() -> RACStreamBindBlock {
@@ -158,21 +177,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(aNotification: NSNotification) {
         // Insert code here to initialize your application
         
-        
         // A note about typing and RACSignals under Swift one bummer about RAC seems to be that the signals themselves do not expose compile-time type information about what they emit, so listeners
         // are expected to cast.  Probably a hangover from Objective-C.  The workarounds online either have you do a manual cast *or* a generic wrapper method which still just casts (even though it does infer from the arguments of the *receiver* of the stream, which is of course the wrong direction).  Presumably RAC3 (with official Swift support) will have a better solution for this.  I can't see any reason why it couldn't...
-        keystrokeSignal().subscribeNext { (untypedsadness: AnyObject!) -> Void in
-            NSLog("YUMMY KEYSTROKES")
-        }
-        
         
         // var poop = NSEvent();
         
         // bind doc: https://github.com/ReactiveCocoa/ReactiveCocoa/blob/master/ReactiveCocoa/RACSignal.m#L92
         
-        var wat = keystrokeSignal().bind(everyOtherEvent).subscribeNext { (woot: AnyObject!) -> Void in
-            NSLog("VOIP \(woot).");
-        }
         
         // so, I need to design my event pipeline.  the main tricky bit is causing something to happen some delay after.  That is, I need to schedule a delay when I get something in the pipeline, BUT then I need to actually cancel that item (ie., not permit it to execute when something new comes through. it may not be possible to do that purely FRP.
         
@@ -182,13 +193,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // (keyStrokeSignal() -> NSEvent) --> (hysteresisDelay(3s) -> StateChange<true|false>) --> (microphoneSubscriber())
         
-        // or, alternatively, in order to avoid implementing hysteresisDelay, which would have to be non-functional code, instead do:
+        hysteresisTimeout(keystrokeSignal(), seconds: 2.0).subscribeNext(
+            { ( hysteresisTimeoutEventBoxed : AnyObject!) -> Void in
+                if(!(hysteresisTimeoutEventBoxed! is EnumContainer<HysteresisTimeoutEvent<AnyObject>>)) {
+                    NSLog("FUCK FARTSADFASFDSAFD")
+                } else {
+                    // NSLog("GOT EVENT!")
+                    var casted = hysteresisTimeoutEventBoxed as EnumContainer<HysteresisTimeoutEvent<AnyObject>>
+                    switch casted.value {
+                    case .Timeout:
+                        NSLog("TIMEOUT!")
+                    case .Arrival:
+                        NSLog("KEY!")
+                    }
+                }
+            }, error: { (err: NSError!) -> Void in
+                NSLog("FAAFDASFDSAFSAD: \(err.debugDescription)")
+            }, completed: { () -> Void in
+                NSLog("COMPLETELD???!")
+            }
+        )
         
-        // keystrokes -> map to tuples of the orig keyboard event and a timeout signal -> mapFlatten -> take latest only, cancel all others -> microphone subscriber
-        
-        // keystrokes ->
-        
-        
+        keystrokeSignal()
+    }
+
+    func applicationWillTerminate(aNotification: NSNotification) {
+        // Insert code here to tear down your application
+    }
+    
+    func spikeSolution() {
         NSEvent.addGlobalMonitorForEventsMatchingMask(NSEventMask.KeyDownMask, { (NSEvent) -> Void in
             // poop smeeee
             NSLog("It's muting time!");
@@ -219,9 +252,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("FUCKFARTS, CANNOT GET YE DEFAULT INPUT DEVICE");
                 return;
             }
-
+            
             // TODO fuck, how do I enumerate the channels?!
-
+            
             var channelsAddress = AudioObjectPropertyAddress(
                 mSelector: UInt32(kAudioDevicePropertyPreferredChannelsForStereo),
                 mScope: UInt32(kAudioDevicePropertyScopeInput),
@@ -262,9 +295,5 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // Now, to see if the gain is settable on it:
         });
-    }
-
-    func applicationWillTerminate(aNotification: NSNotification) {
-        // Insert code here to tear down your application
     }
 }
