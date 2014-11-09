@@ -86,7 +86,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
       *
       * You'll receive values of HysteresisTimeoutEvents.
     */
-    func hysteresisTimeout<T>(incoming: RACSignal, seconds: NSTimeInterval) -> RACSignal/*<HysteresisTimeoutEvent<T>>*/ {
+    func hysteresisTimeout(incoming: RACSignal, seconds: NSTimeInterval) -> RACSignal/*<HysteresisTimeoutEvent<T>>*/ {
         // https://github.com/ReactiveCocoa/ReactiveCocoa/blob/ee85a34731382b01ea028026ef267b0952b7edde/ReactiveCocoa/RACSignal%2BOperations.m
         
         return RACSignal.createSignal { (subscriber:  RACSubscriber!) -> RACDisposable! in
@@ -95,8 +95,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             var scheduler = RACScheduler();
             
             var scheduledTimeoutDisposable = scheduler.afterDelay(seconds, schedule: { () -> Void in
-               
-                subscriber.sendNext(EnumContainer<HysteresisTimeoutEvent<T>>(v: HysteresisTimeoutEvent<T>.Timeout))
+                // using AnyObject as my type parameter for my enum for now, because declaring
+                // this function with a type parameter
+                // bloody well *segfaults* the swift compiler >.<
+                subscriber.sendNext(EnumContainer<HysteresisTimeoutEvent<AnyObject>>(v: HysteresisTimeoutEvent<AnyObject>.Timeout))
             })
             
             scheduledTimeoutDisposable.dispose();
