@@ -10,6 +10,16 @@ import Cocoa
 
 import CoreAudio
 
+// The runtime-called getters for these are currently broken, as of Nov 12 2014.
+// rdar://18921706 rdar://17597453
+let NSVariableStatusItemLength = -1
+let NSSquareStatusItemLength = -2
+
+//>>> AppKit.NSVariableStatusItemLength
+//-1
+//>>> AppKit.NSSquareStatusItemLength
+//-2
+
 enum HysteresisTimeoutEvent<T> {
     /**
      * The observed source of events has emitted a fresh event.
@@ -118,7 +128,7 @@ func muteUnmute(mute: Bool) {
         
         // now, set the volume:
         
-        var newVolume : Float32 = (mute ? 0.0 : 1.0);
+        var newVolume : Float32 = (mute ? 0.0 : 0.7);
 
             error = AudioObjectSetPropertyData(inputDevice, &inputVolumeControlAddress, 0, nil, volumeSize, &newVolume)
 
@@ -131,6 +141,9 @@ func muteUnmute(mute: Bool) {
 
 @NSApplicationMain
 class AppDelegate: NSObject, NSApplicationDelegate {
+    
+    var statusItem : NSStatusItem! = nil
+    
     func keystrokeSignal() -> RACSignal {
         return RACSignal.createSignal({ (subscriber) -> RACDisposable! in
             NSLog("Keyboard listener created!")
@@ -253,7 +266,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // http://www.slideshare.net/colineberhardt/reactive-cocoa-made-simple-with-swift
     
+    // http://www.slideshare.net/jarsen7/learn-you-a-reactive-cocoa-for-great-good
+    
     // http://www.slideshare.net/colineberhardt/reactivecocoa-and-swift-better-together GET RAC+SWIFT STRONG TYPING IMPROVEMENT HACK FROM HERE, PAGE 16
+    
+    
     
     func applicationDidFinishLaunching(aNotification: NSNotification) {
         // Insert code here to initialize your application
@@ -274,7 +291,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // (keyStrokeSignal() -> NSEvent) --> (hysteresisDelay(3s) -> StateChange<true|false>) --> (microphoneSubscriber())
         
-        hysteresisTimeout(keystrokeSignal(), seconds: 2.0).subscribeNext(
+        hysteresisTimeout(keystrokeSignal(), seconds: 1.0).subscribeNext(
             { ( hysteresisTimeoutEventBoxed : AnyObject!) -> Void in
                 if(!(hysteresisTimeoutEventBoxed! is EnumContainer<HysteresisTimeoutEvent<AnyObject>>)) {
                     // TODO: make this a fatal
@@ -293,17 +310,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }, error: { (err: NSError!) -> Void in
                 NSLog("FAAFDASFDSAFSAD: \(err.debugDescription)")
             }, completed: { () -> Void in
-                NSLog("COMPLETELD???!")
+                NSLog("This ")
             }
         )
         
-        keystrokeSignal()
+        activateStatusItem()
     }
 
     func applicationWillTerminate(aNotification: NSNotification) {
         // Insert code here to tear down your application
     }
     
+    // surely there's a better way to do this...?
+    func loadStatusbarImage() -> NSImage {
+        
+        // https://developer.apple.com/library/mac/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Optimizing/Optimizing.html
+        
+        // https://developer.apple.com/library/mac/releasenotes/AppKit/RN-AppKit/
+        
+        // https://developer.apple.com/library/ios/recipes/xcode_help-image_catalog-1.0/Recipe.html does this apply to osx?
+        
+        // return NSImage(contentsOfFile: "fdsafasdfasf")!
+        return NSImage(named: "StatusBarIcon")!
+    }
     
+    func activateStatusItem() {
+        // system wide status bar:
+        var statusBar = NSStatusBar.systemStatusBar()
+        
+        var wat = NSVariableStatusItemLength
+        
+        // our new status bar item:
+        statusItem = statusBar.statusItemWithLength(CGFloat(NSSquareStatusItemLength))
+        
+        statusItem!.button!.image = loadStatusbarImage()
+        
+    }
     
 }
